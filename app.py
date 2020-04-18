@@ -41,7 +41,7 @@ def retrieve_national():
         nat = nat[['confirmed_cases', 'fatalities', 'recovered', 'active']]
 
         # Calculate more columns of interest
-        nat['daily_change'] = nat['active'].diff()
+        nat['daily_change'] = nat['confirmed_cases'].diff()
 
         # Drop pre-filled dates that do not have data yet
         nat = nat.dropna(axis='rows', how='all')
