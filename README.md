@@ -2,7 +2,7 @@
 
 This repo stores the source code for a rudimentary AWS Chalice app that loads data for COVID19 cases in Malaysia. It reads from [this fantastic Google Doc](https://docs.google.com/spreadsheets/d/15A43eb68LT7gg_k9VavYwS1R2KkCTpvigYMn5KT9RTM/) that contains up-to-date information on the COVID19 pandemic in Malaysia, updated after daily press conferences by the Ministry of Health.
 
-Disclaimer: I am not the owner of the aformentioned Google Doc.
+Big thanks to Erhan Azrai (@ErhanAzrai) and Lok Chen Yue (@PentLok), for putting this data together and making it available to all!
 
 ## How to deploy
 
