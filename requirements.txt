@@ -22,4 +22,4 @@ pytz==2019.3
 requests==2.23.0
 six==1.14.0
 triangle==20190115.3
-urllib3==1.25.9
+urllib3==1.26.5
