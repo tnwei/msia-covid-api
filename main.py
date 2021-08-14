@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 import pandas as pd
+import numpy as np
 import git
 
 # Constants
@@ -23,10 +24,12 @@ app = FastAPI()
 
 # Setup temp dirs
 # Cleans up nicely when FastAPI restarts or shuts down
+# Instead of figuring out data persistence, easier to clone
+# to memory on startup for a small app like this
 mohdirobj = tempfile.TemporaryDirectory()
 mohdir_fp = Path(mohdirobj.name)
-# citfdirobj = tempfile.TemporaryDirectory()
-# citfdir_fp = Path(citfdirobj.name)
+citfdirobj = tempfile.TemporaryDirectory()
+citfdir_fp = Path(citfdirobj.name)
 
 print(f"{timer() - start_init_timer:5.1f}s: Temp path created at {mohdirobj.name}")
 
@@ -48,26 +51,44 @@ def pprint_time(total_seconds):
         return f"{int(days)}d {int(hours)}h {int(minutes)}m ago"
 
 
-# Clone to tempdirs
+# Retrieve MOH repo
 try:
     mohrepo = git.Repo.clone_from(MOHREPO_URL, mohdir_fp, depth=1)
-    latest_commit_datetime = mohrepo.commit().committed_datetime
+    latest_mohrepo_commit_datetime = mohrepo.commit().committed_datetime
 
     # gitpython uses its own tz object, replace it
-    latest_commit_datetime = pd.Timestamp(latest_commit_datetime).tz_convert(
-        "Asia/Kuala_Lumpur"
+    latest_mohrepo_commit_datetime = pd.Timestamp(
+        latest_mohrepo_commit_datetime
+    ).tz_convert("Asia/Kuala_Lumpur")
+    time_since_last_mohrepo_commit = (
+        pd.Timestamp.now(tz="Asia/Kuala_Lumpur") - latest_mohrepo_commit_datetime
     )
-    time_since_last_commit = (
-        pd.Timestamp.now(tz="Asia/Kuala_Lumpur") - latest_commit_datetime
-    )
-
-
 except git.GitCommandError as e:
-    print("Failed to clone! Thrown exception:")
+    print("Failed to clone MOH repo! Thrown exception:")
     print(e)
+
+
+# Retrieve CITF repo
+try:
+    citfrepo = git.Repo.clone_from(CITFREPO_URL, citfdir_fp, depth=1)
+    latest_citfrepo_commit_datetime = citfrepo.commit().committed_datetime
+
+    # gitpython uses its own tz object, replace it
+    latest_citfrepo_commit_datetime = pd.Timestamp(
+        latest_citfrepo_commit_datetime
+    ).tz_convert("Asia/Kuala_Lumpur")
+    time_since_last_citfrepo_commit = (
+        pd.Timestamp.now(tz="Asia/Kuala_Lumpur") - latest_citfrepo_commit_datetime
+    )
+except git.GitCommandError as e:
+    print("Failed to clone CITF repo! Thrown exception:")
+    print(e)
+
 print(f"{timer() - start_init_timer:5.1f}s: Git clone complete")
 
-# Load data
+## Prepare data -------------------------------
+
+# MOH repo
 cases_national = pd.read_csv(
     mohdir_fp / "epidemic/cases_malaysia.csv", index_col=0, parse_dates=[0]
 )
@@ -82,6 +103,20 @@ deaths_state = pd.read_csv(
 )
 tests = pd.read_csv(
     mohdir_fp / "epidemic/tests_malaysia.csv", index_col=0, parse_dates=[0]
+)
+
+# CITF repo
+vaxreg_national = pd.read_csv(
+    citfdir_fp / "registration/vaxreg_malaysia.csv", index_col=0, parse_dates=[0]
+)
+vaxreg_state = pd.read_csv(
+    citfdir_fp / "registration/vaxreg_state.csv", index_col=0, parse_dates=[0]
+)
+vax_national = pd.read_csv(
+    citfdir_fp / "vaccination/vax_malaysia.csv", index_col=0, parse_dates=[0]
+)
+vax_state = pd.read_csv(
+    citfdir_fp / "vaccination/vax_state.csv", index_col=0, parse_dates=[0]
 )
 
 # Round out the no-clusters column for national cases
@@ -145,8 +180,8 @@ def return_root(
     state: Optional[MsianState] = None,
 ):
     """
-    Returns COVID19 epidemic data for Malaysia between the specified `start_date`
-    and `end_date`.
+    Returns COVID19 epidemic data for Malaysia between the specified
+    `start_date` and `end_date`.
 
     Args
     ----
@@ -165,13 +200,16 @@ def return_root(
         "terengganu", "kl", "labuan", "putrajaya", "allstates"
 
     + If `state` is not specified, returns national level data which includes:
-        + count of new cases,
-        + count of deaths, and
-        + tests over time
+        + count of daily new cases,
+        + count of daily deaths,
+        + cumulative count of 1st/2nd/total vaccine shots administered,
+        + count of daily tests
 
     + If `state` is specified, returns state level data which includes:
-        + count of new cases,
-        + count of deaths
+        + count of daily new cases,
+        + count of daily deaths,
+        + cumulative count of 1st/2nd/total vaccine shots administered,
+        + count of daily tests
 
     + If `state` is specified as "allstates", returns data for all states
 
@@ -183,7 +221,8 @@ def return_root(
     -----
     + Data source is from the [Malaysian Ministry of Health's github data release]
     (https://github.com/MoH-Malaysia/covid19-public/blob/main/epidemic/README.md)
-    + NaNs in the data will be returned as -9999
+    + NaNs in the data will be returned as -9999. Some of the data updates on a
+    slower cycle, leaving blank entries
 
     """
     print(f"start_date: {start_date}, end_date: {end_date}, state: {state}")
@@ -201,14 +240,20 @@ def return_root(
             [
                 cases_national.loc[start_date:end_date, "cases_new"],
                 deaths_national.loc[start_date:end_date, "deaths_new"],
+                vax_national.loc[
+                    start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul"]
+                ],
                 tests.loc[start_date:end_date, "total_tests"],
             ],
             axis="columns",
         )
+        print(vax_national.loc[start_date:end_date])
 
     elif state == MsianState.allstates:
         ans_list = {}
 
+        # Here is where I wish this was SQL instead
+        # TODO: Must be a cleaner way to do this
         cases_state_selected = cases_state.loc[
             start_date:end_date, ["cases_new", "state"]
         ].reset_index(drop=False)
@@ -217,6 +262,12 @@ def return_root(
         ].reset_index(drop=False)
         pregrouped_ans = cases_state_selected.merge(
             deaths_state_selected, on=["state", "date"], how="inner"
+        )
+        vax_state_selected = vax_state.loc[
+            start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul", "state"]
+        ].reset_index(drop=False)
+        pregrouped_ans = pregrouped_ans.merge(
+            vax_state_selected, on=["state", "date"], how="inner"
         )
 
         print(pregrouped_ans.info())
@@ -252,6 +303,9 @@ def return_root(
                 deaths_state[deaths_state["state"] == pretty_state_name.get(state)].loc[
                     start_date:end_date, "deaths_new"
                 ],
+                vax_state[vax_state["state"] == pretty_state_name.get(state)].loc[
+                    start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul"]
+                ],
             ],
             axis="columns",
         )
@@ -285,38 +339,71 @@ def return_ascii():
     $ curl msiacovidapi.herokuapp.com/ascii
 
     Latest update - Msia COVID19
-    Source: https://github.com/MoH-Malaysia/covid19-public
+    MOH data updated 3h 5m ago
+    Vax data updated 8h 49m ago
 
-                cases_new  deaths_new  total_tests
-    ----------------------------------------------
-    2021-08-09      17236         212       153561
-    2021-08-10      19991         201       144565
-    2021-08-11      20780         211       169444
-    2021-08-12      21668         318       171982
-    2021-08-13      21468         277        -9999
-    Data last updated 12h 11m ago
+                cases_new  deaths_new  dose1_cumul  \
+    -------------------------------------------------
+    2021-08-09     17,236         212   15,959,596
+    2021-08-10     19,991         201   16,119,916
+    2021-08-11     20,780         211   16,347,422
+    2021-08-12     21,668         318   16,545,384
+    2021-08-13     21,468         277   16,707,566
+
+                dose2_cumul  total_cumul  total_tests
+    -------------------------------------------------
+    2021-08-09    9,048,634   25,008,230      153,561
+    2021-08-10    9,246,295   25,366,211      144,565
+    2021-08-11    9,516,141   25,863,563      169,444
+    2021-08-12    9,843,521   26,388,905      171,982
+    2021-08-13   10,144,199   26,851,765       -9,999
+
     ```
     """
     ans = pd.DataFrame.from_dict(return_root(), orient="index")
-    ans_string = ans.to_string()
+    # Add space to columns for better spacing
+    # Easiest workaround
+    ans.columns = [f" {i}" for i in ans.columns]
+
+    ans_string = ans.to_string(
+        line_width=60,
+        justify="right",  # complements spacing workaround
+        # ref: https://stackoverflow.com/a/41447478/13095028
+        formatters=[
+            lambda x: "{:,}".format(x)
+            for _, dtype in ans.dtypes.items()
+            if dtype in [np.dtype("int64"), np.dtype("float64")]
+        ],
+    )
 
     # Further format the ASCII return
     # Calculate the line width
     lwidth = len(ans_string.split("\n", 1)[0])
 
-    # Add table line (what's this called?)
+    # Add "table line" (what's this called?)
     columnrow, body = ans_string.split("\n", 1)
     ans_string = columnrow + "\n" + "-" * lwidth + "\n" + body
 
+    # Add "table line" for subsequent rows
+    # Not proud with how I did this
+    pieces = ans_string.split("\n\n")
+    ans_string = pieces[0]
+    for i in pieces[1:]:
+        front_piece, back_piece = i.split("\n", 1)
+        ans_string = (
+            ans_string + "\n\n" + front_piece + "\n" + "-" * lwidth + "\n" + back_piece
+        )
+
     # Add a header printout
     header = "\nLatest update - Msia COVID19\n"
-    header += f"Source: {MOHREPO_URL}\n\n"
+    # header += f"Source: {MOHREPO_URL}\n\n"
+    header += f"MOH data updated {pprint_time(time_since_last_mohrepo_commit.total_seconds())}\n"
+    header += f"Vax data updated {pprint_time(time_since_last_citfrepo_commit.total_seconds())}\n\n"
     ans_string = header + ans_string
 
     # Add a footer
-    footer = (
-        f"\nData last updated {pprint_time(time_since_last_commit.total_seconds())}\n\n"
-    )
+    # footer = f"\nData last updated {pprint_time(time_since_last_mohrepo_commit.total_seconds())}\n\n"
+    footer = "\n\n"
     ans_string = ans_string + footer
 
     return ans_string
