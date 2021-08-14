@@ -1,45 +1,51 @@
-# Malaysia COVID data loader
+# msia-covid-api
 
-This repo stores the source code for a rudimentary AWS Chalice app that loads data for COVID19 cases in Malaysia. It reads from [this fantastic Google Doc](https://docs.google.com/spreadsheets/d/15A43eb68LT7gg_k9VavYwS1R2KkCTpvigYMn5KT9RTM/) that contains up-to-date information on the COVID19 pandemic in Malaysia, updated after daily press conferences by the Ministry of Health.
-
-Big thanks to Erhan Azrai (@ErhanAzrai) and Lok Chen Yue (@PentLok), for putting this data together and making it available to all!
-
-## How to deploy
-
-Would like to share my link, but I would prefer to keep my AWS usage low. Strip the functions from `app.py` for your own use, or deploy this yourself (and potentially learn a new skill :) ):
-
-1. Install AWS Chalice with `pip install chalice`
-2. You'll need an AWS account, free tier is more than enough. 
-3. Setup your AWS credentials [https://github.com/aws/chalice#credentials](https://github.com/aws/chalice#credentials), 
-4. Run `chalice new-project YOUR-PROJECT-NAME-HERE` to initialize, then replace the default `app.py` and `requirements.txt` with those in this repo.
-5. Run `chalice deploy` from within the project folder. Deploying will take a while as `pandas` has a few too many dependencies, especially in the context of a serverless application.
-6. When done, Chalice will show your Rest API URL.
+Query `http://msiacovidapi.herokuapp.com/` for API access to [case count, testing, contact tracing](https://github.com/MoH-Malaysia/covid19-public), [and vaccination](https://github.com/CITF-Malaysia/citf-public) data, released and updated by the Malaysian Ministry of Health. 
+Note: Work in progress, API subject to further changes until stable (soon). 
 
 ## Usage
 
-``` python
-import pandas as pd
-URL="YOUR-AWS-LAMBDA-API"
+Example: `https://msiacovidapi.herokuapp.com/?start_date=2021-08-08&end_date=2021-08-10&state=kl`
 
-# Latest reported cases, nationwide
-nat = df.read_json(URL + 'latest/national')
+Params:
++ `start_date`: YYYY-MM-DD format e.g. 2021-08-09
++ `end_date`: YYYY-MM-DD format e.g. 2021-08-13
++ `state`: Leave blank for national data, specify `allstates` for all states, specify specific state names (ref to docs) for state data.
 
-# nat.tail()
-#             confirmed_cases  fatalities  recovered  active  daily_change
-# 2020-04-13             4817          77       2276    2464         134.0
-# 2020-04-14             4987          82       2478    2427         170.0
-# 2020-04-15             5072          83       2647    2342          85.0
-# 2020-04-16             5182          84       2766    2332         110.0
-# 2020-04-17             5251          86       2967    2198          69.0
+API reference docs: `http://msiacovidapi.herokuapp.com/docs`
 
-# Latest reported cases, state-by-state
-states = df.read_json(URL + 'latest/states')
+## cURL from terminal
 
-# states.tail()
-#             Perlis  Kedah  Pulau Pinang  Perak  Selangor  ...  Sabah  Sarawak  WP Labuan  WP Kuala Lumpur  WP Putrajaya
-# 2020-04-13    17.0   93.0         116.0  247.0      1249  ...  280.0    348.0       15.0            830.0          54.0
-# 2020-04-14    18.0   93.0         119.0  250.0      1299  ...  285.0    363.0       15.0            899.0          54.0
-# 2020-04-15    18.0   94.0         119.0  250.0      1316  ...  285.0    371.0       15.0            926.0          54.0
-# 2020-04-16    18.0   94.0         119.0  251.0      1329  ...  288.0    387.0       15.0            952.0          55.0
-# 2020-04-17    18.0   94.0         119.0  252.0      1338  ...  293.0    397.0       16.0            971.0          55.0
 ```
+$ curl msiacovidapi.herokuapp.com/ascii
+
+Latest update - Msia COVID19
+MOH data updated 3h 5m ago
+Vax data updated 8h 49m ago
+
+            cases_new  deaths_new  dose1_cumul  \
+-------------------------------------------------
+2021-08-09     17,236         212   15,959,596   
+2021-08-10     19,991         201   16,119,916   
+2021-08-11     20,780         211   16,347,422   
+2021-08-12     21,668         318   16,545,384   
+2021-08-13     21,468         277   16,707,566   
+
+            dose2_cumul  total_cumul  total_tests  
+-------------------------------------------------
+2021-08-09    9,048,634   25,008,230      153,561  
+2021-08-10    9,246,295   25,366,211      144,565  
+2021-08-11    9,516,141   25,863,563      169,444  
+2021-08-12    9,843,521   26,388,905      171,982  
+2021-08-13   10,144,199   26,851,765       -9,999  
+ 
+```
+
+## License
+
+Code is released under the MIT license. For data, quoting the license from the source data repos:
+
+> The data shared in this repository may be used per the terms of reference found in Appendix B of the Pekeliling Pelaksanaan Data Terbuka Bil.1/2015, accessible here:
+> https://www.data.gov.my/p/pekeliling-data-terbuka
+
+
