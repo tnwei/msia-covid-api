@@ -241,7 +241,7 @@ def return_root(
                 cases_national.loc[start_date:end_date, "cases_new"],
                 deaths_national.loc[start_date:end_date, "deaths_new"],
                 vax_national.loc[
-                    start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul"]
+                    start_date:end_date, ["cumul_partial", "cumul_full", "cumul_full"]
                 ],
                 tests.loc[start_date:end_date, "total_tests"],
             ],
@@ -264,7 +264,7 @@ def return_root(
             deaths_state_selected, on=["state", "date"], how="inner"
         )
         vax_state_selected = vax_state.loc[
-            start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul", "state"]
+            start_date:end_date, ["cumul_partial", "cumul_full", "cumul_full", "state"]
         ].reset_index(drop=False)
         pregrouped_ans = pregrouped_ans.merge(
             vax_state_selected, on=["state", "date"], how="inner"
@@ -304,7 +304,7 @@ def return_root(
                     start_date:end_date, "deaths_new"
                 ],
                 vax_state[vax_state["state"] == pretty_state_name.get(state)].loc[
-                    start_date:end_date, ["dose1_cumul", "dose2_cumul", "total_cumul"]
+                    start_date:end_date, ["cumul_partial", "cumul_full", "cumul_full"]
                 ],
             ],
             axis="columns",
@@ -320,8 +320,21 @@ def return_root(
     # Get all data to be int
     ans = ans.astype(int)
 
+    # Rename some column names
+    ans = ans.rename(
+        columns={
+            "cases_new": "New cases",
+            "deaths_new": "Deaths",
+            "cumul_partial": "Sum partially vax'ed",
+            "cumul_full": "Sum fully vax'ed",
+            "total_tests": "Daily tests",
+        }
+    )
+
     # Considering split and index
     # Ended up preferring index
+    # TODO: Resolve warning:
+    # UserWarning: DataFrame columns are not unique, some columns will be omitted.
     ans = ans.to_dict(orient="index")
 
     return ans
