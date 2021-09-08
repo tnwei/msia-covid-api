@@ -41,6 +41,33 @@ Vax data updated 8h 49m ago
  
 ```
 
+## Repo utils
+
+The data schema in source repos are updated as new information arises, which can lead to the API breaking. `generate-data-schema-changelog.py` is used to keep track of data schema updates. Example output: 
+
+``` bash
+$ python generate-data-schema-changelog.py citf
+$ tail citf-schema-changes.txt -n 18 
+Changes in commit b222fd on (2021-08-18 01:07:06+08:00)
+-------------------------------------------------------
++vax_malaysia.csv: pending
++vax_state.csv: pending
+
+-vax_malaysia.csv: cansino
+-vax_malaysia.csv: pending1
+-vax_malaysia.csv: pending2
+-vax_state.csv: cansino
+-vax_state.csv: pending1
+-vax_state.csv: pending2
+
+Changes in commit 536c89 on (2021-08-28 04:35:57+08:00)
+-------------------------------------------------------
++vax_malaysia.csv: cansino
++vax_state.csv: cansino
+```
+
+Conda env specified in `environment.yml`.
+
 ## License
 
 Code is released under the MIT license. For data, quoting the license from the source data repos:
