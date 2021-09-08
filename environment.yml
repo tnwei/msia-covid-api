@@ -1,0 +1,13 @@
+name: msiacovidapi
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - fastapi
+  - uvicorn
+  - pandas
+  - ipykernel
+  - gitpython
+  - locust
+  - tqdm
+prefix: /home/tnwei/miniconda3/envs/msiacovidapi
