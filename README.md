@@ -1,7 +1,8 @@
 # msia-covid-api
 
 Query `http://msiacovidapi.herokuapp.com/` for API access to [case count, testing, contact tracing](https://github.com/MoH-Malaysia/covid19-public), [and vaccination](https://github.com/CITF-Malaysia/citf-public) data, released and updated by the Malaysian Ministry of Health. 
-Note: Work in progress, API subject to further changes until stable (soon). 
+
+Note: Work in progress, API subject to further changes. 
 
 ## Usage
 
@@ -41,9 +42,9 @@ Vax data updated 8h 49m ago
  
 ```
 
-## Repo utils
+## Data schema changes
 
-The data schema in source repos are updated as new information arises, which can lead to the API breaking. `generate-data-schema-changelog.py` is used to keep track of data schema updates. Example output: 
+The data schema in source repos are updated as new information is collected and reported, which can lead to the API breaking. For this purpose, changes to the data schema are tracked regularly for in these gists: [case statistics](https://gist.github.com/tnwei/507f582644b9a8c8be167637cea1e2fc) and [vaccination statistics](https://gist.github.com/tnwei/6b1e974ff0fa5463933c94964a831dd0). `generate-data-schema-changelog.py` is used to keep track of data schema updates. Example output: 
 
 ``` bash
 $ python generate-data-schema-changelog.py citf
@@ -65,6 +66,8 @@ Changes in commit 536c89 on (2021-08-28 04:35:57+08:00)
 +vax_malaysia.csv: cansino
 +vax_state.csv: cansino
 ```
+
+## Dev environment
 
 Conda env specified in `environment.yml`.
 
