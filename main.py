@@ -420,3 +420,11 @@ def return_ascii():
     ans_string = ans_string + footer
 
     return ans_string
+
+
+@app.get("/ping")  # , response_class=PlainTextResponse)
+def return_ping():
+    """
+    Ping endpoint to check API status
+    """
+    return {"pong"}
