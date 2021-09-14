@@ -88,24 +88,37 @@ def main(repo: str, outfile: Optional[str]):
     dirfp = Path(dirobj.name)
 
     # Clone
-    repo = git.Repo.clone_from(repo_url, dirfp)
+    repo_obj = git.Repo.clone_from(repo_url, dirfp)
 
     # Retrieve between two commits
-    # commits = [i for i in repo.iter_commits("b70cdc..HEAD")]
+    # commits = [i for i in repo_obj.iter_commits("b70cdc..HEAD")]
 
     # Retrieve all commits
-    commits = [i for i in repo.iter_commits(all=True)]
+    commits = [i for i in repo_obj.iter_commits(all=True)]
     commits.reverse()  # Because commits are listed last first
 
     print(f"Num commits total: {len(commits)}")
     num_schema_changes = 0
 
+    # Setup header block
+    title = f"Data schema changes in {repo.upper()} repo"
+    underline = "=" * len(title)
+    body = (
+        "Format is <+ or -><filename>: <columnname>. \n"
+        + "'+' means added column, '-' means removed column.\n"
+        + f"Data source: {repo_url}\n"
+    )
+    header_block = title + "\n" + underline + "\n" + body + "\n\n"
+
     with open(outfile, "w") as f:
+        # Write header block
+        f.write(header_block)
+
         # Loop across the commits
         for i in tqdm(range(len(commits) - 1)):
-            repo.git.checkout(commits[i])
+            repo_obj.git.checkout(commits[i])
             prev_repo_schema = return_schema(dirfp)
-            repo.git.checkout(commits[i + 1])
+            repo_obj.git.checkout(commits[i + 1])
             new_repo_schema = return_schema(dirfp)
             diffs = strf_diff_output(
                 list(
