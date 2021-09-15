@@ -13,6 +13,9 @@ def return_moh_schema(filepath: Path) -> Dict:
     for i in filepath.glob("epidemic/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
+    for i in filepath.glob("mysejahtera/*.csv"):
+        df = pd.read_csv(i)
+        schema[i.name] = list(df.columns)
     return schema
 
 
