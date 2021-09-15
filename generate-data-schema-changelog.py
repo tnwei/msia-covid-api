@@ -107,6 +107,7 @@ def main(repo: str, outfile: Optional[str]):
         "Format is <+ or -><filename>: <columnname>. \n"
         + "'+' means added column, '-' means removed column.\n"
         + f"Data source: {repo_url}\n"
+        + "Generated with: https://github.com/tnwei/msia-covid-api/blob/master/generate-data-schema-changelog.py\n"
     )
     header_block = title + "\n" + underline + "\n" + body + "\n\n"
 
