@@ -183,8 +183,8 @@ def return_root(
     state: Optional[MsianState] = None,
 ):
     """
-    Returns COVID19 epidemic data for Malaysia between the specified
-    `start_date` and `end_date`.
+    Returns key COVID19 epidemic data for Malaysia between the specified
+    `start_date` and `end_date`. Use the `detailed/` endpoint for detailed info.
 
     Args
     ----
@@ -330,6 +330,193 @@ def return_root(
     ans = ans.to_dict(orient="index")
 
     return ans
+
+
+@app.get("/detailed")
+def return_detailed(
+    start_date: Optional[datetime.date] = None,
+    end_date: Optional[datetime.date] = None,
+    state: Optional[MsianState] = None,
+):
+    """
+    Returns detailed COVID19 epidemic data for Malaysia between the specified
+    `start_date` and `end_date`. Use the `/` endpoint for key info only.
+    
+    Note that detailed info is subject to constant upstream changes from the
+    MoH and CITF repos.
+
+    Args
+    ----
+    `start_date`: str
+    + Start date in ISO format e.g. "2021-01-01"
+    + If `start_date` is not specified, defaults to five days before current date in GMT+8
+
+    `end_date`: str
+    + End date in ISO format e.g. "2021-01-05"
+    + If `end_date` is not specified, defaults to current date in GMT+8
+
+    `state`: str
+    + The following values are allowed for `state`:
+        "johor", "kedah", "kelantan", "melaka", "negerisembilan", "pahang",
+        "perak", "perlis", "penang", "sabah", "sarawak", "selangor",
+        "terengganu", "kl", "labuan", "putrajaya", "allstates"
+
+    + If `state` is not specified, returns national level data which includes:
+        + count of daily new cases,
+        + count of daily deaths,
+        + cumulative count of 1st/2nd/total vaccine shots administered,
+        + count of daily tests
+        + (detailed only) 
+
+    + If `state` is specified, returns state level data which includes:
+        + count of daily new cases,
+        + count of daily deaths,
+        + cumulative count of 1st/2nd/total vaccine shots administered,
+        + count of daily tests
+        + (detailed only)
+
+    + If `state` is specified as "allstates", returns data for all states
+
+    Returns
+    -------
+    `ans`: JSON response
+
+    Notes
+    -----
+    + Data source is from the [Malaysian Ministry of Health's github data release]
+    (https://github.com/MoH-Malaysia/covid19-public/blob/main/epidemic/README.md)
+    + NaNs in the data will be returned as -9999. Some of the data updates on a
+    slower cycle, leaving blank entries
+
+    """
+    print(f"start_date: {start_date}, end_date: {end_date}, state: {state}")
+    if start_date is None:
+        start_date: datetime.date = (
+            pd.Timestamp.now(tz="Asia/Kuala_Lumpur") - pd.Timedelta("120h")
+        ).date()
+    if end_date is None:
+        end_date: datetime.date = pd.Timestamp.now(tz="Asia/Kuala_Lumpur").date()
+
+    # TODO: Figure out consistent return API for national and state
+    # Return national data
+    if state is None:
+        ans = {}
+
+        # Add each set of national data to the response
+        ans["cases_malaysia"] = cases_malaysia.loc[start_date:end_date]
+        ans["deaths_malaysia"] = deaths_malaysia.loc[start_date:end_date]
+        ans["vax_malaysia"] = vax_national.loc[start_date:end_date]
+        ans["tests_malaysia"] = tests_malaysia.loc[start_date:end_date]
+
+        # Format each set
+        for i in ans.keys():
+            formatted_data = ans[i]
+            # Change pd.DatetimeIndex to datetime.date
+            formatted_data.index = formatted_data.index.map(lambda x: x.date())
+
+            # Purge NaNs as JSON can't serialize them
+            # Rather return an obviously wrong answer than return ambiguous 0
+            formatted_data = formatted_data.fillna(value=-9999)
+
+            # Get all numeric data to be int, ignoring strings
+            formatted_data = formatted_data.astype(int, errors="ignore")
+
+            # Considering split and index
+            # Ended up preferring index
+            formatted_data = formatted_data.to_dict(orient="index")
+
+            # Assign to response
+            ans[i] = formatted_data
+
+        return ans
+
+    elif state == MsianState.allstates:
+        ans = {}
+
+        cases_state_selected = cases_state.loc[start_date:end_date].reset_index(
+            drop=False
+        )
+        deaths_state_selected = deaths_state.loc[start_date:end_date].reset_index(
+            drop=False
+        )
+        pregrouped_ans = cases_state_selected.merge(
+            deaths_state_selected, on=["state", "date"], how="inner"
+        )
+
+        vax_state_selected = vax_state.loc[start_date:end_date].reset_index(drop=False)
+        pregrouped_ans = pregrouped_ans.merge(
+            vax_state_selected, on=["state", "date"], how="inner"
+        )
+
+        tests_state_selected = tests_state.loc[start_date:end_date].reset_index(
+            drop=False
+        )
+        pregrouped_ans = pregrouped_ans.merge(
+            tests_state_selected, on=["state", "date"], how="inner"
+        )
+
+        print(pregrouped_ans.info())
+
+        for statename, unformatted_data in pregrouped_ans.groupby("state"):
+            # Change pd.DatetimeIndex to datetime.date
+            unformatted_data = unformatted_data.set_index("date")
+            unformatted_data.index = unformatted_data.index.map(lambda x: x.date())
+
+            # Purge NaNs as JSON can't serialize them
+            # Rather return an obviously wrong answer than return ambiguous 0
+            unformatted_data = unformatted_data.fillna(value=-9999)
+
+            # Remove the state column
+            unformatted_data = unformatted_data.drop(columns="state")
+
+            # Get all numeric data to be int, ignoring strings
+            unformatted_data = unformatted_data.astype(int, errors="ignore")
+
+            # Considering split and index
+            # Ended up preferring index
+            unformatted_data = unformatted_data.to_dict(orient="index")
+            ans[reverse_pretty_state_name.get(statename)] = unformatted_data
+
+        return ans
+
+    else:
+        ans = {}
+
+        # Add each set of state data to the response
+        ans["cases_state"] = cases_state[
+            cases_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+        ans["deaths_state"] = deaths_state[
+            deaths_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+        ans["vax_state"] = vax_state[
+            vax_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+        ans["tests_state"] = tests_state[
+            tests_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+
+        # Format each set
+        for i in ans.keys():
+            formatted_data = ans[i]
+            # Change pd.DatetimeIndex to datetime.date
+            formatted_data.index = formatted_data.index.map(lambda x: x.date())
+
+            # Purge NaNs as JSON can't serialize them
+            # Rather return an obviously wrong answer than return ambiguous 0
+            formatted_data = formatted_data.fillna(value=-9999)
+
+            # Get all numeric data to be int, ignoring strings
+            formatted_data = formatted_data.astype(int, errors="ignore")
+
+            # Considering split and index
+            # Ended up preferring index
+            formatted_data = formatted_data.to_dict(orient="index")
+
+            # Assign to response
+            ans[i] = formatted_data
+
+        return ans
 
 
 @app.get("/ascii", response_class=PlainTextResponse)
