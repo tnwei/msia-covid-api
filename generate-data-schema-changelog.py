@@ -10,10 +10,10 @@ import argparse
 
 def return_moh_schema(filepath: Path) -> Dict:
     schema = {}
-    for i in filepath.glob("epidemic/*.csv"):
+    for i in filepath.glob("epidemic/**/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
-    for i in filepath.glob("mysejahtera/*.csv"):
+    for i in filepath.glob("mysejahtera/**/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
     return schema
@@ -21,11 +21,11 @@ def return_moh_schema(filepath: Path) -> Dict:
 
 def return_citf_schema(filepath: Path) -> Dict:
     schema = {}
-    for i in filepath.glob("vaccination/*.csv"):
+    for i in filepath.glob("vaccination/**/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
 
-    for i in filepath.glob("registration/*.csv"):
+    for i in filepath.glob("registration/**/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
 
