@@ -89,20 +89,23 @@ print(f"{timer() - start_init_timer:5.1f}s: Git clone complete")
 ## Prepare data -------------------------------
 
 # MOH repo
-cases_national = pd.read_csv(
+cases_malaysia = pd.read_csv(
     mohdir_fp / "epidemic/cases_malaysia.csv", index_col=0, parse_dates=[0]
 )
 cases_state = pd.read_csv(
     mohdir_fp / "epidemic/cases_state.csv", index_col=0, parse_dates=[0]
 )
-deaths_national = pd.read_csv(
+deaths_malaysia = pd.read_csv(
     mohdir_fp / "epidemic/deaths_malaysia.csv", index_col=0, parse_dates=[0]
 )
 deaths_state = pd.read_csv(
     mohdir_fp / "epidemic/deaths_state.csv", index_col=0, parse_dates=[0]
 )
-tests = pd.read_csv(
+tests_malaysia = pd.read_csv(
     mohdir_fp / "epidemic/tests_malaysia.csv", index_col=0, parse_dates=[0]
+)
+tests_state = pd.read_csv(
+    mohdir_fp / "epidemic/tests_state.csv", index_col=0, parse_dates=[0]
 )
 
 # CITF repo
@@ -120,12 +123,12 @@ vax_state = pd.read_csv(
 )
 
 # Round out the no-clusters column for national cases
-cases_national["cluster_none"] = cases_national["cases_new"] - cases_national.drop(
+cases_malaysia["cluster_none"] = cases_malaysia["cases_new"] - cases_malaysia.drop(
     columns=["cases_new"]
 ).sum(axis="columns")
 
 # Add a total tests column
-tests["total_tests"] = tests.sum(axis="columns")
+tests_malaysia["total_tests"] = tests_malaysia.sum(axis="columns")
 
 ## Prepare the API ------------------------------------
 class MsianState(str, Enum):
@@ -238,12 +241,12 @@ def return_root(
     if state is None:
         ans = pd.concat(
             [
-                cases_national.loc[start_date:end_date, "cases_new"],
-                deaths_national.loc[start_date:end_date, "deaths_new"],
+                cases_malaysia.loc[start_date:end_date, "cases_new"],
+                deaths_malaysia.loc[start_date:end_date, "deaths_new"],
                 vax_national.loc[
                     start_date:end_date, ["cumul_partial", "cumul_full", "cumul_full"]
                 ],
-                tests.loc[start_date:end_date, "total_tests"],
+                tests_malaysia.loc[start_date:end_date, "total_tests"],
             ],
             axis="columns",
         )
