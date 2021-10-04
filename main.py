@@ -383,19 +383,25 @@ def return_detailed(
         "perak", "perlis", "penang", "sabah", "sarawak", "selangor",
         "terengganu", "kl", "labuan", "putrajaya", "allstates"
 
-    + If `state` is not specified, returns national level data which includes:
-        + count of daily new cases,
-        + count of daily deaths,
-        + cumulative count of 1st/2nd/total vaccine shots administered,
-        + count of daily tests
-        + (detailed only) 
+    + If `state` is not specified, returns national level data which includes all columns
+        in the following files from the MoH and CITF data repos:
+        + (MoH) epidemic/cases_malaysia.csv
+        + (MoH) epidemic/deaths_malaysia.csv
+        + (MoH) epidemic/tests_malaysia.csv
+        + (MoH) epidemic/hospital.csv --> aggregated to national level
+        + (MoH) icu/hospital.csv --> aggregated to national level
+        + (MoH) pkrc/hospital.csv --> aggregated to national level
+        + (CITF) vaccination/vax_malaysia.csv
 
-    + If `state` is specified, returns state level data which includes:
-        + count of daily new cases,
-        + count of daily deaths,
-        + cumulative count of 1st/2nd/total vaccine shots administered,
-        + count of daily tests
-        + (detailed only)
+    + If `state` is specified, returns state level data which includes all columns in the
+        following files from the MoH and CITF data repos:
+        + (MoH) epidemic/cases_state.csv
+        + (MoH) epidemic/deaths_state.csv
+        + (MoH) epidemic/tests_state.csv
+        + (MoH) epidemic/hospital.csv
+        + (MoH) icu/hospital.csv
+        + (MoH) pkrc/hospital.csv
+        + (CITF) vaccination/vax_state.csv
 
     + If `state` is specified as "allstates", returns data for all states
 
@@ -419,7 +425,6 @@ def return_detailed(
     if end_date is None:
         end_date: datetime.date = pd.Timestamp.now(tz="Asia/Kuala_Lumpur").date()
 
-    # TODO: Figure out consistent return API for national and state
     # Return national data
     if state is None:
         ans = {}

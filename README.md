@@ -2,18 +2,59 @@
 
 Query `http://msiacovidapi.herokuapp.com/` for API access to [case count, testing, contact tracing](https://github.com/MoH-Malaysia/covid19-public), [and vaccination](https://github.com/CITF-Malaysia/citf-public) data, released and updated by the Malaysian Ministry of Health. 
 
-Note: Work in progress, API subject to further changes. 
-
 ## Usage
 
-Example: `https://msiacovidapi.herokuapp.com/?start_date=2021-08-08&end_date=2021-08-10&state=kl`
+Call the `/` endpoint for summary info. Returns new cases, deaths, cumulative vaccinations and tests. Example query: `https://msiacovidapi.herokuapp.com/?start_date=2021-08-08&end_date=2021-08-10&state=kl`
 
-Params:
-+ `start_date`: YYYY-MM-DD format e.g. 2021-08-09
-+ `end_date`: YYYY-MM-DD format e.g. 2021-08-13
+Call the `detailed/` endpoint using the same params above to retrieve detailed statistics uploaded by MoH. Example query: `https://msiacovidapi.herokuapp.com/detailed/?start_date=2021-08-08&end_date=2021-08-10&state=kl`
+
+Refer to API docs for more info: `http://msiacovidapi.herokuapp.com/docs`
+
+Use the following param for both the summary and detailed endpoints:
+
++ `start_date`: YYYY-MM-DD format e.g. 2021-08-09. If left blank, defaults to five days before current date.
++ `end_date`: YYYY-MM-DD format e.g. 2021-08-13. If left blank, defaults to current date.
 + `state`: Leave blank for national data, specify `allstates` for all states, specify specific state names (ref to docs) for state data.
 
-API reference docs: `http://msiacovidapi.herokuapp.com/docs`
+
+## Example usage for data analysis in Python
+
+``` python
+import requests
+import pandas as pd
+
+# National summary for last 5 days
+nat_sum = requests.get("http://msiacovidapi.herokuapp.com/").json()
+nat_sum_df = pd.DataFrame.from_dict(nat_sum, orient="index")
+
+# State summary for last 5 days
+selangor_sum = requests.get("http://msiacovidapi.herokuapp.com/?state=selangor").json()
+selangor_sum_df = pd.DataFrame.from_dict(selangor_sum, orient="index")
+
+# Summary of all states for last 5 days
+allstates_sum = requests.get("http://msiacovidapi.herokuapp.com/?state=allstates").json()
+# allstates returns a Dict of states
+selangor_sum_df_from_allstates = pd.DataFrame.from_dict(allstates_sum["selangor"], orient="index")
+
+# National detailed for last 5 days
+nat_detailed = requests.get("http://msiacovidapi.herokuapp.com/detailed").json()
+print(nat_detailed.keys())
+# dict_keys(['cases_malaysia', 'deaths_malaysia', 'vax_malaysia', 'tests_malaysia', 'hospital_malaysia', 'icu_malaysia', 'pkrc_malaysia'])
+cases_malaysia = nat_detailed["cases_malaysia"]
+
+# State detailed for last 5 days
+selangor_detailed = requests.get("http://msiacovidapi.herokuapp.com/detailed?state=selangor").json()
+print(selangor_detailed.keys())
+# dict_keys(['cases_state', 'deaths_state', 'vax_state', 'tests_state', 'hospital_state', 'icu_state', 'pkrc_state'])
+selangor_cases_state = pd.DataFrame.from_dict(selangor_detailed["cases_state"], orient="index")
+
+# Detailed info of all states for last 5 days
+allstates_detailed = requests.get("http://msiacovidapi.herokuapp.com/detailed?state=allstates").json()
+print(allstates_detailed.keys())
+# dict_keys(['johor', 'kedah', 'kelantan', 'melaka', 'negerisembilan', 'pahang', 'perak', 'perlis', 'penang', 'sabah', 'sarawak', 'selangor', 'terengganu', 'kl', 'labuan', 'putrajaya'])
+selangor_cases_state_from_allstates = pd.DataFrame.from_dict(allstates_detailed["selangor"]["cases_state"], orient="index")
+```
+
 
 ## cURL from terminal
 
