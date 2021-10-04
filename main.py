@@ -7,7 +7,7 @@ from pathlib import Path
 import datetime
 from enum import Enum
 
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 import pandas as pd
@@ -89,44 +89,48 @@ print(f"{timer() - start_init_timer:5.1f}s: Git clone complete")
 ## Prepare data -------------------------------
 
 # MOH repo
-cases_malaysia = pd.read_csv(
+cases_malaysia: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/cases_malaysia.csv", index_col=0, parse_dates=[0]
 )
-cases_state = pd.read_csv(
+cases_state: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/cases_state.csv", index_col=0, parse_dates=[0]
 )
-deaths_malaysia = pd.read_csv(
+deaths_malaysia: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/deaths_malaysia.csv", index_col=0, parse_dates=[0]
 )
-deaths_state = pd.read_csv(
+deaths_state: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/deaths_state.csv", index_col=0, parse_dates=[0]
 )
-tests_malaysia = pd.read_csv(
+tests_malaysia: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/tests_malaysia.csv", index_col=0, parse_dates=[0]
 )
-tests_state = pd.read_csv(
+tests_state: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/tests_state.csv", index_col=0, parse_dates=[0]
 )
-hospital_state = pd.read_csv(
+hospital_state: pd.DataFrame = pd.read_csv(
     mohdir_fp / "epidemic/hospital.csv", index_col=0, parse_dates=[0]
 )
-hospital_malaysia = hospital_state.groupby("date").sum()
-icu_state = pd.read_csv(mohdir_fp / "epidemic/icu.csv", index_col=0, parse_dates=[0])
-icu_malaysia = icu_state.groupby("date").sum()
-pkrc_state = pd.read_csv(mohdir_fp / "epidemic/pkrc.csv", index_col=0, parse_dates=[0])
-pkrc_malaysia = pkrc_state.groupby("date").sum()
+hospital_malaysia: pd.DataFrame = hospital_state.groupby("date").sum()
+icu_state: pd.DataFrame = pd.read_csv(
+    mohdir_fp / "epidemic/icu.csv", index_col=0, parse_dates=[0]
+)
+icu_malaysia: pd.DataFrame = icu_state.groupby("date").sum()
+pkrc_state: pd.DataFrame = pd.read_csv(
+    mohdir_fp / "epidemic/pkrc.csv", index_col=0, parse_dates=[0]
+)
+pkrc_malaysia: pd.DataFrame = pkrc_state.groupby("date").sum()
 
 # CITF repo
-vaxreg_national = pd.read_csv(
+vaxreg_malaysia: pd.DataFrame = pd.read_csv(
     citfdir_fp / "registration/vaxreg_malaysia.csv", index_col=0, parse_dates=[0]
 )
-vaxreg_state = pd.read_csv(
+vaxreg_state: pd.DataFrame = pd.read_csv(
     citfdir_fp / "registration/vaxreg_state.csv", index_col=0, parse_dates=[0]
 )
-vax_national = pd.read_csv(
+vax_malaysia: pd.DataFrame = pd.read_csv(
     citfdir_fp / "vaccination/vax_malaysia.csv", index_col=0, parse_dates=[0]
 )
-vax_state = pd.read_csv(
+vax_state: pd.DataFrame = pd.read_csv(
     citfdir_fp / "vaccination/vax_state.csv", index_col=0, parse_dates=[0]
 )
 
@@ -178,7 +182,7 @@ pretty_state_name = {
     MsianState.putrajaya: "W.P. Putrajaya",
 }
 
-reverse_pretty_state_name = {j: i for i, j in pretty_state_name.items()}
+reverse_pretty_state_name: Dict = {j: i for i, j in pretty_state_name.items()}
 
 end_init_timer = timer()
 print(f"{end_init_timer - start_init_timer:5.1f}s: API init complete")
@@ -244,21 +248,35 @@ def return_root(
     if end_date is None:
         end_date: datetime.date = pd.Timestamp.now(tz="Asia/Kuala_Lumpur").date()
 
-    # TODO: Figure out consistent return API for national and state
     # Return national data
     if state is None:
         ans = pd.concat(
             [
                 cases_malaysia.loc[start_date:end_date, "cases_new"],
                 deaths_malaysia.loc[start_date:end_date, "deaths_new"],
-                vax_national.loc[
+                vax_malaysia.loc[
                     start_date:end_date, ["cumul_partial", "cumul_full", "cumul_full"]
                 ],
                 tests_malaysia.loc[start_date:end_date, "total_tests"],
             ],
             axis="columns",
         )
-        print(vax_national.loc[start_date:end_date])
+
+        # Change pd.DatetimeIndex to datetime.date
+        ans.index = ans.index.map(lambda x: x.date())
+
+        # Purge NaNs as JSON can't serialize them
+        # Rather return an obviously wrong answer than return ambiguous 0
+        ans = ans.fillna(value=-9999)
+
+        # Get all numeric data to be int, ignoring strings
+        ans = ans.astype(int, errors="ignore")
+
+        # Considering split and index
+        # Ended up preferring index
+        ans = ans.to_dict(orient="index")
+
+        return ans
 
     elif state == MsianState.allstates:
         ans_list = {}
@@ -281,8 +299,6 @@ def return_root(
             vax_state_selected, on=["state", "date"], how="inner"
         )
 
-        print(pregrouped_ans.info())
-
         for statename, ans in pregrouped_ans.groupby("state"):
             # Change pd.DatetimeIndex to datetime.date
             ans = ans.set_index("date")
@@ -295,8 +311,8 @@ def return_root(
             # Remove the state column
             ans = ans.drop(columns="state")
 
-            # Get all data to be int
-            ans = ans.astype(int)
+            # Get all numeric data to be int, ignoring strings
+            ans = ans.astype(int, errors="ignore")
 
             # Considering split and index
             # Ended up preferring index
@@ -321,23 +337,21 @@ def return_root(
             axis="columns",
         )
 
-    # Change pd.DatetimeIndex to datetime.date
-    ans.index = ans.index.map(lambda x: x.date())
+        # Change pd.DatetimeIndex to datetime.date
+        ans.index = ans.index.map(lambda x: x.date())
 
-    # Purge NaNs as JSON can't serialize them
-    # Rather return an obviously wrong answer than return ambiguous 0
-    ans = ans.fillna(value=-9999)
+        # Purge NaNs as JSON can't serialize them
+        # Rather return an obviously wrong answer than return ambiguous 0
+        ans = ans.fillna(value=-9999)
 
-    # Get all data to be int
-    ans = ans.astype(int)
+        # Get all numeric data to be int, ignoring strings
+        ans = ans.astype(int, errors="ignore")
 
-    # Considering split and index
-    # Ended up preferring index
-    # TODO: Resolve warning:
-    # UserWarning: DataFrame columns are not unique, some columns will be omitted.
-    ans = ans.to_dict(orient="index")
+        # Considering split and index
+        # Ended up preferring index
+        ans = ans.to_dict(orient="index")
 
-    return ans
+        return ans
 
 
 @app.get("/detailed")
@@ -413,7 +427,7 @@ def return_detailed(
         # Add each set of national data to the response
         ans["cases_malaysia"] = cases_malaysia.loc[start_date:end_date]
         ans["deaths_malaysia"] = deaths_malaysia.loc[start_date:end_date]
-        ans["vax_malaysia"] = vax_national.loc[start_date:end_date]
+        ans["vax_malaysia"] = vax_malaysia.loc[start_date:end_date]
         ans["tests_malaysia"] = tests_malaysia.loc[start_date:end_date]
         ans["hospital_malaysia"] = hospital_malaysia.loc[start_date:end_date]
         ans["icu_malaysia"] = icu_malaysia.loc[start_date:end_date]
@@ -443,7 +457,7 @@ def return_detailed(
 
     elif state == MsianState.allstates:
         ans = {}
-        for i, j in pretty_state_name.items():
+        for i, _ in pretty_state_name.items():
             ans[i] = return_detailed(start_date=start_date, end_date=end_date, state=i)
         return ans
 
