@@ -107,6 +107,14 @@ tests_malaysia = pd.read_csv(
 tests_state = pd.read_csv(
     mohdir_fp / "epidemic/tests_state.csv", index_col=0, parse_dates=[0]
 )
+hospital_state = pd.read_csv(
+    mohdir_fp / "epidemic/hospital.csv", index_col=0, parse_dates=[0]
+)
+hospital_malaysia = hospital_state.groupby("date").sum()
+icu_state = pd.read_csv(mohdir_fp / "epidemic/icu.csv", index_col=0, parse_dates=[0])
+icu_malaysia = icu_state.groupby("date").sum()
+pkrc_state = pd.read_csv(mohdir_fp / "epidemic/pkrc.csv", index_col=0, parse_dates=[0])
+pkrc_malaysia = pkrc_state.groupby("date").sum()
 
 # CITF repo
 vaxreg_national = pd.read_csv(
@@ -407,6 +415,9 @@ def return_detailed(
         ans["deaths_malaysia"] = deaths_malaysia.loc[start_date:end_date]
         ans["vax_malaysia"] = vax_national.loc[start_date:end_date]
         ans["tests_malaysia"] = tests_malaysia.loc[start_date:end_date]
+        ans["hospital_malaysia"] = hospital_malaysia.loc[start_date:end_date]
+        ans["icu_malaysia"] = icu_malaysia.loc[start_date:end_date]
+        ans["pkrc_malaysia"] = pkrc_malaysia.loc[start_date:end_date]
 
         # Format each set
         for i in ans.keys():
@@ -432,51 +443,8 @@ def return_detailed(
 
     elif state == MsianState.allstates:
         ans = {}
-
-        cases_state_selected = cases_state.loc[start_date:end_date].reset_index(
-            drop=False
-        )
-        deaths_state_selected = deaths_state.loc[start_date:end_date].reset_index(
-            drop=False
-        )
-        pregrouped_ans = cases_state_selected.merge(
-            deaths_state_selected, on=["state", "date"], how="inner"
-        )
-
-        vax_state_selected = vax_state.loc[start_date:end_date].reset_index(drop=False)
-        pregrouped_ans = pregrouped_ans.merge(
-            vax_state_selected, on=["state", "date"], how="inner"
-        )
-
-        tests_state_selected = tests_state.loc[start_date:end_date].reset_index(
-            drop=False
-        )
-        pregrouped_ans = pregrouped_ans.merge(
-            tests_state_selected, on=["state", "date"], how="inner"
-        )
-
-        print(pregrouped_ans.info())
-
-        for statename, unformatted_data in pregrouped_ans.groupby("state"):
-            # Change pd.DatetimeIndex to datetime.date
-            unformatted_data = unformatted_data.set_index("date")
-            unformatted_data.index = unformatted_data.index.map(lambda x: x.date())
-
-            # Purge NaNs as JSON can't serialize them
-            # Rather return an obviously wrong answer than return ambiguous 0
-            unformatted_data = unformatted_data.fillna(value=-9999)
-
-            # Remove the state column
-            unformatted_data = unformatted_data.drop(columns="state")
-
-            # Get all numeric data to be int, ignoring strings
-            unformatted_data = unformatted_data.astype(int, errors="ignore")
-
-            # Considering split and index
-            # Ended up preferring index
-            unformatted_data = unformatted_data.to_dict(orient="index")
-            ans[reverse_pretty_state_name.get(statename)] = unformatted_data
-
+        for i, j in pretty_state_name.items():
+            ans[i] = return_detailed(start_date=start_date, end_date=end_date, state=i)
         return ans
 
     else:
@@ -495,10 +463,23 @@ def return_detailed(
         ans["tests_state"] = tests_state[
             tests_state["state"] == pretty_state_name.get(state)
         ].loc[start_date:end_date]
+        ans["hospital_state"] = hospital_state[
+            hospital_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+        ans["icu_state"] = icu_state[
+            icu_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
+        ans["pkrc_state"] = pkrc_state[
+            pkrc_state["state"] == pretty_state_name.get(state)
+        ].loc[start_date:end_date]
 
         # Format each set
         for i in ans.keys():
             formatted_data = ans[i]
+
+            # Drop the state column
+            formatted_data = formatted_data.drop(columns="state")
+
             # Change pd.DatetimeIndex to datetime.date
             formatted_data.index = formatted_data.index.map(lambda x: x.date())
 
