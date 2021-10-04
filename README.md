@@ -111,9 +111,9 @@ Changes in commit 536c89 on (2021-08-28 04:35:57+08:00)
 +vax_state.csv: cansino
 ```
 
-## Dev environment
+## Requirements
 
-Conda env specified in `environment.yml`.
+`pip install requirements.txt`. Additionally requires `pytest` to run tests. 
 
 ## License
 
