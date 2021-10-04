@@ -323,17 +323,6 @@ def return_root(
     # Get all data to be int
     ans = ans.astype(int)
 
-    # Rename some column names
-    ans = ans.rename(
-        columns={
-            "cases_new": "New cases",
-            "deaths_new": "Deaths",
-            "cumul_partial": "Sum partially vax'ed",
-            "cumul_full": "Sum fully vax'ed",
-            "total_tests": "Daily tests",
-        }
-    )
-
     # Considering split and index
     # Ended up preferring index
     # TODO: Resolve warning:
@@ -377,6 +366,18 @@ def return_ascii():
     ```
     """
     ans = pd.DataFrame.from_dict(return_root(), orient="index")
+
+    # Rename some column names
+    ans = ans.rename(
+        columns={
+            "cases_new": "New cases",
+            "deaths_new": "Deaths",
+            "cumul_partial": "Sum partially vax'ed",
+            "cumul_full": "Sum fully vax'ed",
+            "total_tests": "Daily tests",
+        }
+    )
+
     # Add space to columns for better spacing
     # Easiest workaround
     ans.columns = [f" {i}" for i in ans.columns]
