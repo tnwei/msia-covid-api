@@ -4,6 +4,7 @@
 ![License](https://img.shields.io/github/license/tnwei/msia-covid-api)
 
 Query `http://msiacovidapi.herokuapp.com/` for API access to [case count, testing, contact tracing](https://github.com/MoH-Malaysia/covid19-public), [and vaccination](https://github.com/CITF-Malaysia/citf-public) data, released and updated by the Malaysian Ministry of Health. 
+Design decisions documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Usage
 
