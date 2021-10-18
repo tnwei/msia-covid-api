@@ -1,26 +1,65 @@
+import argparse
+import difflib
 import tempfile
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import git
 import pandas as pd
-from pathlib import Path
-import difflib
-from typing import Dict, List, Optional
 from tqdm import tqdm
-import argparse
 
 
-def return_moh_schema(filepath: Path) -> Dict:
+def return_moh_schema(filepath: Path) -> Tuple[Dict, Dict]:
     schema = {}
+    errors = {}
     for i in filepath.glob("epidemic/**/*.csv"):
-        df = pd.read_csv(i)
-        schema[i.name] = list(df.columns)
+        try:
+            df = pd.read_csv(i)
+            schema[i.name] = list(df.columns)
+        except pd.errors.ParserError as e:
+            # Cater for key-in errors breaking the schema
+            one_file_error = []
+            one_file_error.append("Data entry error, cannot read directly as CSV")
+            print(f"Error reading file {i} with following exception:")
+            print(e)
+
+            with open(i, "r") as f:
+                # Read the header
+                cols = f.readline().strip()
+            cols = [i.strip() for i in cols.split(",")]
+            print("Columns parsed directly from file instead:")
+            print(cols)
+
+            schema[i.name] = cols
+            errors[i.name] = one_file_error
+
     for i in filepath.glob("mysejahtera/**/*.csv"):
-        df = pd.read_csv(i)
-        schema[i.name] = list(df.columns)
-    return schema
+        try:
+            df = pd.read_csv(i)
+            schema[i.name] = list(df.columns)
+        except pd.errors.ParserError as e:
+            # Cater for key-in errors breaking the schema
+            one_file_error = []
+            one_file_error.append("Data entry error, cannot read directly as CSV")
+
+            print(f"Error reading file {i} with following exception:")
+            print(e)
+            with open(i, "r") as f:
+                # Read the header
+                cols = f.readline().strip()
+            cols = [i.strip() for i in cols.split(",")]
+            print("Columns parsed directly from file instead:")
+            print(cols)
+
+            schema[i.name] = cols
+            errors[i.name] = one_file_error
+
+    return schema, errors
 
 
-def return_citf_schema(filepath: Path) -> Dict:
+def return_citf_schema(filepath: Path) -> Tuple[Dict, Dict]:
     schema = {}
+    errors = {}
     for i in filepath.glob("vaccination/**/*.csv"):
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
@@ -29,7 +68,7 @@ def return_citf_schema(filepath: Path) -> Dict:
         df = pd.read_csv(i)
         schema[i.name] = list(df.columns)
 
-    return schema
+    return schema, errors
 
 
 def schema2text(schema: Dict) -> List:
@@ -121,14 +160,36 @@ def main(repo: str, outfile: Optional[str]):
         # Loop across the commits
         for i in tqdm(range(len(commits) - 1)):
             repo_obj.git.checkout(commits[i])
-            prev_repo_schema = return_schema(dirfp)
+            try:
+                prev_repo_schema, prev_errors = return_schema(dirfp)
+            except Exception as e:
+                print(f"Errored out on commit {commits[i]} with following exception:")
+                print(e)
+                raise e
+
             repo_obj.git.checkout(commits[i + 1])
-            new_repo_schema = return_schema(dirfp)
+            try:
+                new_repo_schema, new_errors = return_schema(dirfp)
+            except Exception as e:
+                print(f"Errored out on commit {commits[i+1]} with following exception:")
+                print(e)
+                raise e
+
             diffs = strf_diff_output(
                 list(
                     difflib.unified_diff(
                         schema2text(prev_repo_schema),
                         schema2text(new_repo_schema),
+                        n=0,  # remove all context lines
+                    )
+                )
+            )
+
+            errors = strf_diff_output(
+                list(
+                    difflib.unified_diff(
+                        schema2text(prev_errors),
+                        schema2text(new_errors),
                         n=0,  # remove all context lines
                     )
                 )
@@ -144,8 +205,29 @@ def main(repo: str, outfile: Optional[str]):
                 title_str = f"Changes in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
                 f.write(title_str + "\n")
                 f.write("-" * len(title_str) + "\n")
-                f.write("".join(positives) + "\n")
-                f.write("".join(negatives) + "\n")
+
+                if len(positives) != 0:
+                    f.write("".join(positives) + "\n")
+                if len(negatives) != 0:
+                    f.write("".join(negatives) + "\n")
+
+            if len(errors) == 0:
+                pass
+            else:
+                negatives = [i for i in errors if i.startswith("-")]
+                positives = [i for i in errors if i.startswith("+")]
+
+                negatives = [i.replace("-", "fixed: ") for i in negatives]
+                positives = [i.replace("+", "error: ") for i in positives]
+
+                title_str = f"Data errors in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
+                f.write(title_str + "\n")
+                f.write("-" * len(title_str) + "\n")
+                if len(positives) != 0:
+                    f.write("".join(positives) + "\n")
+                if len(negatives) != 0:
+                    f.write("".join(negatives) + "\n")
+
     print(f"{num_schema_changes} schema changes found, written to {outfile}")
 
 
