@@ -3,6 +3,7 @@ import difflib
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+import shelve
 
 import git
 import pandas as pd
@@ -120,9 +121,11 @@ def main(repo: str, outfile: Optional[str]):
 
     if repo == "moh":
         repo_url = "https://github.com/MoH-Malaysia/covid19-public"
+        cache_fname = ".moh-schema-cache"
         return_schema = return_moh_schema
     elif repo == "citf":
         repo_url = "https://github.com/CITF-Malaysia/citf-public"
+        cache_fname = ".citf-schema-cache"
         return_schema = return_citf_schema
 
     # Setup data schema
@@ -139,6 +142,9 @@ def main(repo: str, outfile: Optional[str]):
     commits = [i for i in repo_obj.iter_commits(all=True)]
     commits.reverse()  # Because commits are listed last first
 
+    # Open cache
+    cache = shelve.open(cache_fname)
+
     print(f"Num commits total: {len(commits)}")
     num_schema_changes = 0
 
@@ -153,80 +159,93 @@ def main(repo: str, outfile: Optional[str]):
     )
     header_block = title + "\n" + underline + "\n" + body + "\n\n"
 
-    with open(outfile, "w") as f:
-        # Write header block
-        f.write(header_block)
+    writelines = []
 
-        # Loop across the commits
-        for i in tqdm(range(len(commits) - 1)):
+    # Loop across the commits
+    for i in tqdm(range(len(commits) - 1)):
+        if commits[i].hexsha in cache.keys():
+            prev_repo_schema, prev_errors = cache.get(commits[i].hexsha)
+        else:
             repo_obj.git.checkout(commits[i])
+
             try:
                 prev_repo_schema, prev_errors = return_schema(dirfp)
+                cache[commits[i].hexsha] = prev_repo_schema, prev_errors
             except Exception as e:
                 print(f"Errored out on commit {commits[i]} with following exception:")
                 print(e)
                 raise e
 
+        if commits[i + 1].hexsha in cache.keys():
+            new_repo_schema, new_errors = cache.get(commits[i + 1].hexsha)
+        else:
             repo_obj.git.checkout(commits[i + 1])
             try:
                 new_repo_schema, new_errors = return_schema(dirfp)
+                cache[commits[i + 1].hexsha] = new_repo_schema, new_errors
             except Exception as e:
                 print(f"Errored out on commit {commits[i+1]} with following exception:")
                 print(e)
                 raise e
 
-            diffs = strf_diff_output(
-                list(
-                    difflib.unified_diff(
-                        schema2text(prev_repo_schema),
-                        schema2text(new_repo_schema),
-                        n=0,  # remove all context lines
-                    )
+        diffs = strf_diff_output(
+            list(
+                difflib.unified_diff(
+                    schema2text(prev_repo_schema),
+                    schema2text(new_repo_schema),
+                    n=0,  # remove all context lines
                 )
             )
+        )
 
-            errors = strf_diff_output(
-                list(
-                    difflib.unified_diff(
-                        schema2text(prev_errors),
-                        schema2text(new_errors),
-                        n=0,  # remove all context lines
-                    )
+        errors = strf_diff_output(
+            list(
+                difflib.unified_diff(
+                    schema2text(prev_errors),
+                    schema2text(new_errors),
+                    n=0,  # remove all context lines
                 )
             )
+        )
 
-            if len(diffs) == 0:
-                pass
-            else:
-                num_schema_changes += 1
-                negatives = [i for i in diffs if i.startswith("-")]
-                positives = [i for i in diffs if i.startswith("+")]
+        if len(diffs) == 0:
+            pass
+        else:
+            num_schema_changes += 1
+            negatives = [i for i in diffs if i.startswith("-")]
+            positives = [i for i in diffs if i.startswith("+")]
 
-                title_str = f"Changes in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
-                f.write(title_str + "\n")
-                f.write("-" * len(title_str) + "\n")
+            title_str = f"Changes in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
+            writelines.append(title_str + "\n")
+            writelines.append("-" * len(title_str) + "\n")
 
-                if len(positives) != 0:
-                    f.write("".join(positives) + "\n")
-                if len(negatives) != 0:
-                    f.write("".join(negatives) + "\n")
+            if len(positives) != 0:
+                writelines.append("".join(positives) + "\n")
+            if len(negatives) != 0:
+                writelines.append("".join(negatives) + "\n")
 
-            if len(errors) == 0:
-                pass
-            else:
-                negatives = [i for i in errors if i.startswith("-")]
-                positives = [i for i in errors if i.startswith("+")]
+        if len(errors) == 0:
+            pass
+        else:
+            negatives = [i for i in errors if i.startswith("-")]
+            positives = [i for i in errors if i.startswith("+")]
 
-                negatives = [i.replace("-", "fixed: ") for i in negatives]
-                positives = [i.replace("+", "error: ") for i in positives]
+            negatives = [i.replace("-", "fixed: ") for i in negatives]
+            positives = [i.replace("+", "error: ") for i in positives]
 
-                title_str = f"Data errors in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
-                f.write(title_str + "\n")
-                f.write("-" * len(title_str) + "\n")
-                if len(positives) != 0:
-                    f.write("".join(positives) + "\n")
-                if len(negatives) != 0:
-                    f.write("".join(negatives) + "\n")
+            title_str = f"Data errors in commit {commits[i+1].hexsha[:6]} on ({commits[i+1].committed_datetime})"
+            writelines.append(title_str + "\n")
+            writelines.append("-" * len(title_str) + "\n")
+            if len(positives) != 0:
+                writelines.append("".join(positives) + "\n")
+            if len(negatives) != 0:
+                writelines.append("".join(negatives) + "\n")
+
+    cache.close()
+
+    with open(outfile, "w") as f:
+        f.write(header_block)
+        f.writelines(writelines)
 
     print(f"{num_schema_changes} schema changes found, written to {outfile}")
 
