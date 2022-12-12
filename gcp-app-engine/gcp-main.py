@@ -17,27 +17,20 @@ app = FastAPI()
 print(f"{timer()- start_init_timer:5.1f}s: FastAPI instance initialized")
 
 ## Hard-coded variables
-cases_malaysia_url = (
-    "https://storage.googleapis.com/msia-covid-api-data/cases_malaysia.csv"
-)
-cases_state_url = "https://storage.googleapis.com/msia-covid-api-data/cases_state.csv"
-deaths_malaysia_url = (
-    "https://storage.googleapis.com/msia-covid-api-data/deaths_malaysia.csv"
-)
-deaths_state_url = "https://storage.googleapis.com/msia-covid-api-data/deaths_state.csv"
-tests_malaysia_url = (
-    "https://storage.googleapis.com/msia-covid-api-data/tests_malaysia.csv"
-)
-tests_state_url = "https://storage.googleapis.com/msia-covid-api-data/tests_state.csv"
-hospital_state_url = "https://storage.googleapis.com/msia-covid-api-data/hospital.csv"
-icu_state_url = "https://storage.googleapis.com/msia-covid-api-data/icu.csv"
-pkrc_state_url = "https://storage.googleapis.com/msia-covid-api-data/pkrc.csv"
-vaxreg_malaysia_url = (
-    "https://storage.googleapis.com/msia-covid-api-data/vaxreg_malaysia.csv"
-)
-vaxreg_state_url = "https://storage.googleapis.com/msia-covid-api-data/vaxreg_state.csv"
-vax_malaysia_url = "https://storage.googleapis.com/msia-covid-api-data/vax_malaysia.csv"
-vax_state_url = "https://storage.googleapis.com/msia-covid-api-data/vax_state.csv"
+bucket_url = "https://storage.googleapis.com/msia-covid-api-data-bucket/"
+cases_malaysia_url = bucket_url + "cases_malaysia.csv"
+cases_state_url = bucket_url + "cases_state.csv"
+deaths_malaysia_url = bucket_url + "deaths_malaysia.csv"
+deaths_state_url = bucket_url + "deaths_state.csv"
+tests_malaysia_url = bucket_url + "tests_malaysia.csv"
+tests_state_url = bucket_url + "tests_state.csv"
+hospital_state_url = bucket_url + "hospital.csv"
+icu_state_url = bucket_url + "icu.csv"
+pkrc_state_url = bucket_url + "pkrc.csv"
+vaxreg_malaysia_url = bucket_url + "vaxreg_malaysia.csv"
+vaxreg_state_url = bucket_url + "vaxreg_state.csv"
+vax_malaysia_url = bucket_url + "vax_malaysia.csv"
+vax_state_url = bucket_url + "vax_state.csv"
 
 
 def pprint_time(total_seconds):
@@ -75,11 +68,11 @@ tests_state: pd.DataFrame = pd.read_csv(tests_state_url, index_col=0, parse_date
 hospital_state: pd.DataFrame = pd.read_csv(
     hospital_state_url, index_col=0, parse_dates=[0]
 )
-hospital_malaysia: pd.DataFrame = hospital_state.groupby("date").sum()
+hospital_malaysia: pd.DataFrame = hospital_state.groupby("date").sum(numeric_only=True)
 icu_state: pd.DataFrame = pd.read_csv(icu_state_url, index_col=0, parse_dates=[0])
-icu_malaysia: pd.DataFrame = icu_state.groupby("date").sum()
+icu_malaysia: pd.DataFrame = icu_state.groupby("date").sum(numeric_only=True)
 pkrc_state: pd.DataFrame = pd.read_csv(pkrc_state_url, index_col=0, parse_dates=[0])
-pkrc_malaysia: pd.DataFrame = pkrc_state.groupby("date").sum()
+pkrc_malaysia: pd.DataFrame = pkrc_state.groupby("date").sum(numeric_only=True)
 
 # CITF repo
 vaxreg_malaysia: pd.DataFrame = pd.read_csv(
