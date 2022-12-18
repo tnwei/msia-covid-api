@@ -95,13 +95,13 @@ tests_malaysia["total_tests"] = tests_malaysia.sum(axis="columns")
 # Figure out last commit times
 last_mohrepo_commit_dt = requests.get(
     "https://api.github.com/repos/MoH-Malaysia/covid19-public"
-).json()["updated_at"]
+).json()["pushed_at"]
 last_mohrepo_commit_dt = pd.Timestamp(last_mohrepo_commit_dt).tz_convert(
     "Asia/Kuala_Lumpur"
 )
 last_citfrepo_commit_dt = requests.get(
     "https://api.github.com/repos/CITF-Malaysia/citf-public"
-).json()["updated_at"]
+).json()["pushed_at"]
 last_citfrepo_commit_dt = pd.Timestamp(last_citfrepo_commit_dt).tz_convert(
     "Asia/Kuala_Lumpur"
 )
