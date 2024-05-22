@@ -27,8 +27,6 @@ tests_state_url = bucket_url + "tests_state.csv"
 hospital_state_url = bucket_url + "hospital.csv"
 icu_state_url = bucket_url + "icu.csv"
 pkrc_state_url = bucket_url + "pkrc.csv"
-vaxreg_malaysia_url = bucket_url + "vaxreg_malaysia.csv"
-vaxreg_state_url = bucket_url + "vaxreg_state.csv"
 vax_malaysia_url = bucket_url + "vax_malaysia.csv"
 vax_state_url = bucket_url + "vax_state.csv"
 
@@ -75,10 +73,6 @@ pkrc_state: pd.DataFrame = pd.read_csv(pkrc_state_url, index_col=0, parse_dates=
 pkrc_malaysia: pd.DataFrame = pkrc_state.groupby("date").sum(numeric_only=True)
 
 # CITF repo
-vaxreg_malaysia: pd.DataFrame = pd.read_csv(
-    vaxreg_malaysia_url, index_col=0, parse_dates=[0]
-)
-vaxreg_state: pd.DataFrame = pd.read_csv(vaxreg_state_url, index_col=0, parse_dates=[0])
 vax_malaysia: pd.DataFrame = pd.read_csv(vax_malaysia_url, index_col=0, parse_dates=[0])
 vax_state: pd.DataFrame = pd.read_csv(vax_state_url, index_col=0, parse_dates=[0])
 
@@ -105,6 +99,7 @@ last_citfrepo_commit_dt = requests.get(
 last_citfrepo_commit_dt = pd.Timestamp(last_citfrepo_commit_dt).tz_convert(
     "Asia/Kuala_Lumpur"
 )
+
 
 ## Prepare the API ------------------------------------
 class MsianState(str, Enum):
