@@ -117,6 +117,7 @@ Changes in commit 536c89 on (2021-08-28 04:35:57+08:00)
 ## Changes
 
 + (8ac732a) Migrated to GCP following Heroku free tier shutting down. I plan to keep this online as long as MoH keeps uploading data.
++ (95668d2) Small update to adjust to upstream changes in data source. Been 4 years wow
 
 ## License
 
